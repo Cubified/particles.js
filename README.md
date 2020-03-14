@@ -21,5 +21,5 @@ On each frame, each particle's position is updated using its velocity vector, an
   - `(sign(particle2.x or .y - particle1.x or .y) * gravitational_constant * interaction_force)/dist(particle2, particle1)`
   - In English:
     - The particle that is past the other should experience a leftward force, while the particle that is behind the other should experience a rightward force (`sign(...)`)
-    - The attractive/repulsive strength decreases as the distance between the two particles increases (`interaction_force`)
+    - The attractive/repulsive strength decreases as the distance between the two particles increases (`interaction_force/dist(...)`)
 - Add the x and y components of the net force vector to the x and y components of the velocity respectively, dividing first by the particle's mass
