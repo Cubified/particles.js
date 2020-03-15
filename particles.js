@@ -3,10 +3,11 @@
  */
 
 //////////////////////////////
-// CONSTANTS
+// GLOBAL VARIABLES
 //
-const constants = {
+let constants = {
   canvas: document.querySelector('#canv'),
+  ctx: document.querySelector('#canv').getContext('2d', {alpha:false}),
   clear_color: '#333333',
   n_particles: 100,
   particle_size: 10,
@@ -18,11 +19,7 @@ const constants = {
   air_resistance: 0,
   gravitational_constant: 1000*1000
 };
-constants.ctx = constants.canvas.getContext('2d', {alpha:false});
 
-//////////////////////////////
-// GLOBAL VARIABLES
-//
 let mouse = {
   is_down: false,
   pos: {x: 0, y: 0},
@@ -45,6 +42,7 @@ function canv_clear(){
 function canv_draw(){
   canv_clear();
 
+  /* Draw circle around mouse if held */
   if(mouse.is_down){
     constants.ctx.fillStyle = '#ffffff33';
     constants.ctx.beginPath();
@@ -59,6 +57,7 @@ function canv_draw(){
   }
 
   particles.forEach((particle)=>{
+    /* Draw particle trail */
     // Double equals are not an error -- triple equals always returns false after selecting an option in dat.GUI
     if(constants.trail_style == 0){
       particle.state.pos_past.forEach((trail, ind)=>{
@@ -94,6 +93,7 @@ function canv_draw(){
       constants.ctx.fill();
     }
 
+    /* Draw particle itself */
     constants.ctx.fillStyle = particle.props.draw_color;
     constants.ctx.beginPath();
     constants.ctx.arc(
@@ -156,12 +156,8 @@ let particles = [];
 //////////////////////////////
 // SIMULATION FUNCTIONS
 //
-function sim_init(n_particles){
-  let n = n_particles;
-  if(n === undefined){
-    n = constants.n_particles;
-  }
-  for(let i=0;i<n;i++){
+function sim_init(n_particles = constants.n_particles){
+  for(let i=0;i<n_particles;i++){
     let part = {
       state: {
         pos: {
@@ -275,7 +271,7 @@ function sim_update(){
       f_net_y = constants.max_force * Math.sign(f_net_y);
     }
     particle.state.vel.x += f_net_x*Math.cos(theta)/particle.props.mass;
-    particle.state.vel.y += f_net_y*Math.cos(theta)/particle.props.mass; /* Not certain why sine doesn't work properly here */
+    particle.state.vel.y += f_net_y*Math.cos(theta)/particle.props.mass; // Not certain why sine doesn't work properly here
   });
 }
 
@@ -283,99 +279,123 @@ function sim_update(){
 // DAT.GUI
 //
 let gui = new dat.GUI();
-let folder_particles = gui.addFolder('Particle Properties');
 
-let temp = {add:()=>{
-  let name = Math.floor(Math.random()*1000).toString(16);
-  let forces = {};
-  forces[name] = [-1.0,1.0][Math.floor(Math.random()*2)];
-  for(let key in particle_types){
-    forces[key] = [-1.0, 1.0][Math.floor(Math.random()*2)];
-    particle_types[key].forces[name] = [-1.0, 1.0][Math.floor(Math.random()*2)];
-    folder_particles.__folders[key].__folders['Interactions'].add(particle_types[key].forces, name).name(`With ${name}`);
-  }
-  particle_types[name] = {
-    type: name,
-    forces,
-    mass: 1.0,
-    draw_color: `#${(0xFFFFFF*Math.random()).toFixed(0).toString(16).slice(0, 6)}`,
-    remove: ()=>{
-      delete particle_types[name];
+function gui_init(){
+  let folder_particles = gui.addFolder('Particle Properties');
+
+  let temp = {add:()=>{
+    let name = Math.floor(Math.random()*1000).toString(16);
+    let forces = {};
+    forces[name] = [-1.0,1.0][Math.floor(Math.random()*2)];
+    for(let key in particle_types){
+      forces[key] = [-1.0, 1.0][Math.floor(Math.random()*2)];
+      particle_types[key].forces[name] = [-1.0, 1.0][Math.floor(Math.random()*2)];
+      folder_particles.__folders[key].__folders['Interactions'].add(particle_types[key].forces, name).name(`With ${name}`);
     }
-  };
+    particle_types[name] = {
+      type: name,
+      forces,
+      mass: 1.0,
+      draw_color: `#${(0xFFFFFF*Math.random()).toFixed(0).toString(16).slice(0, 6)}`,
+      remove: ()=>{
+        delete particle_types[name];
+      }
+    };
 
-  particles = [];
-  add_particle_folder(name);
-  sim_init();
-}};
-folder_particles.add(temp, 'add').name('Add New');
-
-function add_particle_folder(key){
-  let folder = folder_particles.addFolder(key);
-  folder.add(particle_types[key], 'mass').name('Mass');
-  folder.add(particle_types[key], 'draw_color').name('Color');
-  let subfolder = folder.addFolder('Interactions');
-  for(let key_force in particle_types[key].forces){
-    subfolder.add(particle_types[key].forces, key_force).name(`With ${key_force}`);
-  }
-
-  let remove_controller = folder.add(particle_types[key], 'remove').name('Remove');
-  // Two different approaches are used between this and add_controller, potential
-  //   TODO is to ensure uniformity
-  // Beyond this, this solution feels clunky and inelegant despite it working
-  remove_controller.onFinishChange(()=>{
     particles = [];
-    folder_particles.removeFolder(folder);
-    for(let particle_subfolder in folder_particles.__folders){
-      let interactions_subfolder = folder_particles.__folders[particle_subfolder].__folders['Interactions'];
-      interactions_subfolder.__controllers.forEach((particle_controller)=>{
-        if(particle_controller.property === key){
-          interactions_subfolder.remove(particle_controller);
-        }
-      });
-    }
+    add_particle_folder(name);
     sim_init();
+  }};
+  folder_particles.add(temp, 'add').name('Add New');
+
+  function add_particle_folder(key){
+    let folder = folder_particles.addFolder(key);
+    folder.add(particle_types[key], 'mass').name('Mass');
+    folder.addColor(particle_types[key], 'draw_color').name('Color');
+    let subfolder = folder.addFolder('Interactions');
+    for(let key_force in particle_types[key].forces){
+      subfolder.add(particle_types[key].forces, key_force).name(`With ${key_force}`);
+    }
+
+    let remove_controller = folder.add(particle_types[key], 'remove').name('Remove');
+    // Two different approaches are used between this and add_controller, potential
+    //   TODO is to ensure uniformity
+    // Beyond this, this solution feels clunky and inelegant despite it working
+    remove_controller.onFinishChange(()=>{
+      particles = [];
+      folder_particles.removeFolder(folder);
+      for(let particle_subfolder in folder_particles.__folders){
+        let interactions_subfolder = folder_particles.__folders[particle_subfolder].__folders['Interactions'];
+        interactions_subfolder.__controllers.forEach((particle_controller)=>{
+          if(particle_controller.property === key){
+            interactions_subfolder.remove(particle_controller);
+          }
+        });
+      }
+      sim_init();
+    });
+  }
+  for(let key in particle_types){
+    add_particle_folder(key);
+  }
+
+  let folder_simulation = gui.addFolder('Simulation Properties');
+
+  let n_particles_controller = folder_simulation.add(constants, 'n_particles').name('# of Particles');
+  n_particles_controller.onFinishChange((val)=>{
+    let val_rounded = Math.round(val);
+    while(particles.length > val_rounded){
+      particles.shift();
+    }
+    if(particles.length < val_rounded){
+      sim_init(val_rounded-particles.length);
+    }
   });
+
+  folder_simulation.add(constants, 'max_vel').name('Max Velocity');
+  folder_simulation.add(constants, 'max_force').name('Max Net Force');
+  folder_simulation.add(constants, 'max_radius').name('Attraction Radius');
+  folder_simulation.add(constants, 'air_resistance').name('Air Resistance');
+  folder_simulation.add(constants, 'gravitational_constant').name('Grav. Constant');
+
+  let folder_render = gui.addFolder('Render Properties');
+  folder_render.addColor(constants, 'clear_color').name('Bgd. Color');
+  folder_render.add(constants, 'particle_size').name('Particle Size');
+  folder_render.add(constants, 'trail_length').name('Trail Length');
+  folder_render.add(constants, 'trail_style', {gradient_laggy: 0, fast: 1}).name('Trail Style');
+
+  let folder_mouse = gui.addFolder('Mouse Properties');
+  folder_mouse.add(mouse, 'max_radius').name('Force Radius');
+  folder_mouse.add(mouse, 'force').name('Force Direction');
 }
-for(let key in particle_types){
-  add_particle_folder(key);
-}
-
-let folder_simulation = gui.addFolder('Simulation Properties');
-
-let n_particles_controller = folder_simulation.add(constants, 'n_particles').name('# of Particles');
-n_particles_controller.onFinishChange((val)=>{
-  let val_rounded = Math.round(val);
-  while(particles.length > val_rounded){
-    particles.shift();
-  }
-  if(particles.length < val_rounded){
-    sim_init(val_rounded-particles.length);
-  }
-});
-
-folder_simulation.add(constants, 'max_vel').name('Max Velocity');
-folder_simulation.add(constants, 'max_force').name('Max Net Force');
-folder_simulation.add(constants, 'max_radius').name('Max Attraction Radius');
-folder_simulation.add(constants, 'air_resistance').name('Air Resistance');
-folder_simulation.add(constants, 'gravitational_constant').name('Grav. Constant');
-
-let folder_render = gui.addFolder('Render Properties');
-folder_render.add(constants, 'clear_color').name('Bgd. Color');
-folder_render.add(constants, 'particle_size').name('Particle Size');
-folder_render.add(constants, 'trail_length').name('Trail Length');
-folder_render.add(constants, 'trail_style', {gradient_laggy: 0, fast: 1}).name('Trail Style');
-
-let folder_mouse = gui.addFolder('Mouse Properties');
-folder_mouse.add(mouse, 'max_radius').name('Force Radius');
-folder_mouse.add(mouse, 'force').name('Force Direction');
 
 //////////////////////////////
 // STATS
 //
 let stats = new Stats();
-stats.showPanel(0);
-document.body.appendChild(stats.dom);
+
+function stats_init(){
+  stats.showPanel(0);
+  document.body.appendChild(stats.dom);
+}
+
+//////////////////////////////
+// IMPROVED MOBILE SUPPORT
+//
+function mobile_init(){
+  // A regex/more robust detection method is not necessary here,
+  //   as the changes applied are not due to the device being
+  //   mobile, but rather due to the small screen size
+  if(window.innerWidth <= 800 &&
+     window.innerHeight <= 600){
+    constants.n_particles = 50;
+    constants.trail_length = 15;
+    constants.max_vel = 2;
+    constants.max_force = 10;
+    constants.gravitational_constant = 100*100;
+    gui.close();
+  }
+}
 
 //////////////////////////////
 // RENDER LOOP AND LISTENERS
@@ -397,8 +417,11 @@ function on_resize(){
   constants.canvas.height = window.innerHeight;
 }
 
-function on_mousedown(){
+function on_mousedown(e){
+  e.preventDefault();
+
   mouse.is_down = true;
+  on_mousemove(e);
 }
 
 function on_mouseup(){
@@ -406,14 +429,29 @@ function on_mouseup(){
 }
 
 function on_mousemove(e){
-  mouse.pos.x = e.clientX;
-  mouse.pos.y = e.clientY;
+  e.preventDefault();
+
+  mouse.pos.x = e.pageX;
+  mouse.pos.y = e.pageY;
 }
 
-window.addEventListener('resize', on_resize);
-constants.canvas.addEventListener('mousedown', on_mousedown);
-constants.canvas.addEventListener('mouseup',   on_mouseup  );
-constants.canvas.addEventListener('mousemove', on_mousemove);
+function listeners_init(){
+  window.addEventListener('resize', on_resize);
+
+  constants.canvas.addEventListener('mousedown', on_mousedown);
+  constants.canvas.addEventListener('mouseup',   on_mouseup  );
+  constants.canvas.addEventListener('mousemove', on_mousemove);
+
+  constants.canvas.addEventListener('touchstart', on_mousedown);
+  constants.canvas.addEventListener('touchend',   on_mouseup  );
+  constants.canvas.addEventListener('touchmove',  on_mousemove);
+}
+
+mobile_init();
+gui_init();
+stats_init();
+listeners_init();
 canv_init();
 sim_init();
+
 loop();
