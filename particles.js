@@ -88,8 +88,25 @@ function canv_draw(){
       constants.ctx.fillStyle = particle.props.draw_color + '33';
       constants.ctx.beginPath();
       constants.ctx.moveTo(particle.state.pos.x-conformed_velocity.x, particle.state.pos.y-conformed_velocity.y);
-      constants.ctx.lineTo(particle.state.pos.x-(constants.particle_size/2), particle.state.pos.y-(constants.particle_size/2));
-      constants.ctx.lineTo(particle.state.pos.x+(constants.particle_size/2), particle.state.pos.y+(constants.particle_size/2));
+
+      // There is most likely a way to optimize this
+      if(particle.state.vel.y < 0){
+        if(particle.state.vel.x < 0){
+          constants.ctx.lineTo(particle.state.pos.x-(constants.particle_size/2), particle.state.pos.y+(constants.particle_size/2));
+          constants.ctx.lineTo(particle.state.pos.x+(constants.particle_size/2), particle.state.pos.y-(constants.particle_size/2));
+        } else {
+          constants.ctx.lineTo(particle.state.pos.x+(constants.particle_size/2), particle.state.pos.y+(constants.particle_size/2));
+          constants.ctx.lineTo(particle.state.pos.x-(constants.particle_size/2), particle.state.pos.y-(constants.particle_size/2));
+        }
+      } else {
+        if(particle.state.vel.x < 0){
+          constants.ctx.lineTo(particle.state.pos.x-(constants.particle_size/2), particle.state.pos.y-(constants.particle_size/2));
+          constants.ctx.lineTo(particle.state.pos.x+(constants.particle_size/2), particle.state.pos.y+(constants.particle_size/2));
+        } else {
+          constants.ctx.lineTo(particle.state.pos.x+(constants.particle_size/2), particle.state.pos.y-(constants.particle_size/2));
+          constants.ctx.lineTo(particle.state.pos.x-(constants.particle_size/2), particle.state.pos.y+(constants.particle_size/2));
+        }
+      }
       constants.ctx.fill();
     }
 
@@ -236,6 +253,8 @@ function sim_update(){
     }
 
     /* Calculate gravitation */
+    // TODO: Some particles will change velocity so quickly that they begin to flicker
+    //         back and forth around another particle, fix
     let f_net_x = 0,
         f_net_y = 0,
         r = 0,
